@@ -1,9 +1,25 @@
 import asyncio
+import logging
+import os
 from contextlib import asynccontextmanager, suppress
+from pathlib import Path
 
 import pytest
 from telethon import TelegramClient, events
 from telethon.tl.custom.message import Message
+
+LOG_DIR = Path(__file__).resolve().parent / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+E2E_LOG_FILE = Path(os.getenv("E2E_LOG_FILE", LOG_DIR / "e2e_test.log"))
+
+logger = logging.getLogger("e2e_test")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    file_handler = logging.FileHandler(E2E_LOG_FILE, encoding="utf-8")
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    logger.propagate = False
 
 
 class ReplyCollector:
@@ -94,7 +110,7 @@ async def test_start_command(client: TelegramClient):
         
         assert '/start' not in response.text
         assert len(response.text) > 0
-        print(f"Лог: Бот ответил: {response.text[:50]}...")
+        logger.info("Бот ответил: %s...", response.text[:50])
 
 @pytest.mark.asyncio
 async def test_recommendation_scenario(client: TelegramClient):
@@ -111,6 +127,6 @@ async def test_recommendation_scenario(client: TelegramClient):
         follow_up = await conv.get_response()
         
         assert "Выберите" in follow_up.text or "Доклад" in follow_up.text
-        print("Лог: Сценарий рекомендаций пройден успешно.")
+        logger.info("Сценарий рекомендаций пройден успешно.")
 
 # Для запуска: pytest tests/e2e_test.py
