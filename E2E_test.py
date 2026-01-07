@@ -6,7 +6,7 @@ from telethon.tl.custom.message import Message
 # Данные для авторизации (получить на my.telegram.org)
 API_ID = 'YOUR_API_ID'
 API_HASH = 'YOUR_API_HASH'
-BOT_USERNAME = '@your_cool_bot'
+BOT_USERNAME = '@jugru_conf_bot'
 SESSION_NAME = 'test_user_session'
 
 @pytest.fixture(scope="session")
