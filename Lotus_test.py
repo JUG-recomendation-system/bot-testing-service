@@ -1,4 +1,4 @@
-from locust import HttpUser, task,封装, between
+from locust import HttpUser, task, between
 import random
 
 class BotBackendUser(HttpUser):
