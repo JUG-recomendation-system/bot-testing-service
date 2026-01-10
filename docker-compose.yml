@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  bot-tester:
+    build: .
+    container_name: bot_tester_app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./sessions:/app/sessions    # Чтобы сессия не пропадала при перезапуске
+      - ./logs:/app/logs            # Чтобы видеть логи на хосте
+      - ./scenarios.csv:/app/scenarios.csv # Чтобы можно было править сценарии без пересборки
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

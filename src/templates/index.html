@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Бот Тестер</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; color: #333; max-width: 1000px; margin: 0 auto; padding: 20px; }
+        h1 { color: #2c3e50; }
+        .container { display: flex; gap: 20px; }
+        .controls { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .logs-panel { flex: 2; background: #2b2b2b; color: #f1f1f1; padding: 20px; border-radius: 8px; height: 500px; overflow-y: auto; font-family: monospace; }
+        
+        button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #3498db;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        button:hover { background-color: #2980b9; }
+        button.run-all { background-color: #27ae60; font-weight: bold; }
+        button.run-all:hover { background-color: #219150; }
+
+        .log-entry { margin-bottom: 5px; border-bottom: 1px solid #444; padding-bottom: 2px; }
+        .log-error { color: #e74c3c; font-weight: bold; }
+        .log-info { color: #2ecc71; }
+    </style>
+</head>
+<body>
+
+    <h1>🤖 Тестирование Telegram Бота</h1>
+    
+    <div class="container">
+        <div class="controls">
+            <h3>Сценарии</h3>
+            <button class="run-all" onclick="runTest('all')">▶ Запустить ВСЕ сценарии</button>
+            <hr>
+            {% for scenario in scenarios %}
+            <button onclick="runTest('{{ scenario }}')">▶ {{ scenario }}</button>
+            {% endfor %}
+            
+            <div style="margin-top: 30px; font-size: 0.9em; color: #777;">
+                <p>Добавьте новые сценарии в <code>scenarios.csv</code> и перезагрузите страницу.</p>
+            </div>
+        </div>
+
+        <div class="logs-panel" id="log-container">
+            <div>Ожидание запуска...</div>
+        </div>
+    </div>
+
+    <script>
+        // Функция отправки запроса на запуск
+        async function runTest(scenarioName) {
+            const logContainer = document.getElementById('log-container');
+            logContainer.innerHTML = `<div class="log-info">--- Инициализация запуска: ${scenarioName} ---</div>`;
+            
+            try {
+                const response = await fetch(`/run/${encodeURIComponent(scenarioName)}`, { method: 'POST' });
+                const data = await response.json();
+                console.log(data);
+            } catch (error) {
+                alert("Ошибка при вызове API: " + error);
+            }
+        }
+
+        // Подключение к потоку логов (Server-Sent Events)
+        const evtSource = new EventSource("/logs");
+        evtSource.onmessage = function(event) {
+            const logContainer = document.getElementById('log-container');
+            const newLog = document.createElement("div");
+            newLog.className = "log-entry";
+            
+            // Раскраска логов
+            if (event.data.includes("ERROR")) {
+                newLog.classList.add("log-error");
+            } else if (event.data.includes("INFO")) {
+                newLog.classList.add("log-info");
+            }
+            
+            newLog.textContent = event.data;
+            logContainer.appendChild(newLog);
+            
+            // Автопрокрутка вниз
+            logContainer.scrollTop = logContainer.scrollHeight;
+        };
+    </script>
+
+</body>
+</html>
