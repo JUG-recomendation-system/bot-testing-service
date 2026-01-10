@@ -1,19 +1,24 @@
-# Используем легкий образ Python
-FROM python:3.10-slim
+FROM python:3.11-slim
 
-# Устанавливаем рабочую директорию внутри контейнера
+# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем файл зависимостей и устанавливаем их
+# Устанавливаем зависимости Python
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 
-# Копируем весь проект внутрь контейнера
+# Копируем проект
 COPY . .
 
-# Создаем папку для логов и сессий, чтобы не было ошибок прав доступа
-RUN mkdir -p /app/logs /app/sessions
+# Указываем PYTHONPATH, чтобы Python всегда видел папку /app как корень для импортов
+ENV PYTHONPATH=/app
+# Отключаем буферизацию логов, чтобы видеть ошибки мгновенно
+ENV PYTHONUNBUFFERED=1
 
-# Указываем команду для запуска веб-приложения
-# host 0.0.0.0 делает сайт доступным снаружи контейнера
-CMD ["uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "8000"]
+RUN mkdir -p logs sessions
+
+EXPOSE 8000
+
+# Используем прямой вызов uvicorn. 
+# Если файл лежит в src/app.py, то путь src.app:app верный при условии правильного PYTHONPATH
+CMD ["python", "-m", "uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   bot-tester:
     build: .
@@ -10,6 +8,8 @@ services:
       - ./sessions:/app/sessions    # Чтобы сессия не пропадала при перезапуске
       - ./logs:/app/logs            # Чтобы видеть логи на хосте
       - ./scenarios.csv:/app/scenarios.csv # Чтобы можно было править сценарии без пересборки
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
