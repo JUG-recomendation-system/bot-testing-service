@@ -8,6 +8,12 @@ import pytest
 from telethon import TelegramClient, events
 from telethon.tl.custom.message import Message
 
+# Данные для авторизации (получить на my.telegram.org)
+API_ID = 'YOUR_API_ID'
+API_HASH = 'YOUR_API_HASH'
+BOT_USERNAME = '@jugru_conf_bot'
+SESSION_NAME = 'test_user_session'
+
 LOG_DIR = Path(__file__).resolve().parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 E2E_LOG_FILE = Path(os.getenv("E2E_LOG_FILE", LOG_DIR / "e2e_test.log"))
@@ -87,12 +93,6 @@ class ReplyCollector:
                 len(self.collected_replies) == amount
             ), "Received unexpected messages amount."
 
-# Данные для авторизации (получить на my.telegram.org)
-API_ID = 'YOUR_API_ID'
-API_HASH = 'YOUR_API_HASH'
-BOT_USERNAME = '@jugru_conf_bot'
-SESSION_NAME = 'test_user_session'
-
 @pytest.fixture(scope="session")
 async def client():
     """Инициализация клиента Telegram для тестов."""
@@ -128,5 +128,3 @@ async def test_recommendation_scenario(client: TelegramClient):
         
         assert "Выберите" in follow_up.text or "Доклад" in follow_up.text
         logger.info("Сценарий рекомендаций пройден успешно.")
-
-# Для запуска: pytest tests/e2e_test.py
