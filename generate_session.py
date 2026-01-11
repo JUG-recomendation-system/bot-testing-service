@@ -1,10 +1,16 @@
 import asyncio
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 from telethon import TelegramClient, errors
 
-# --- НАСТРОЙКА ПУТЕЙ ---
+# --- ИНСТРУКЦИЯ ---
+# 1. Запустите скрипт: python generate_session.py
+# 2. Введите номер (для Test DC 2: 9996621111)
+# 3. Введите код (для Test DC 2: 22222)
+# 4. Если приглашение ">>" не появилось через 5 секунд, нажмите Enter.
+
 BASE_DIR = Path(__file__).parent.resolve()
 ENV_PATH = BASE_DIR / '.env'
 SESSION_DIR = BASE_DIR / 'sessions'
@@ -14,80 +20,105 @@ load_dotenv(dotenv_path=ENV_PATH)
 
 API_ID = os.getenv("TELEGRAM_API_ID") or os.getenv("API_ID")
 API_HASH = os.getenv("TELEGRAM_API_HASH") or os.getenv("API_HASH")
+
+# Настройки из вашего примера или дефолты
 CONNECT_TIMEOUT = int(os.getenv("TELEGRAM_CONNECT_TIMEOUT", "20"))
-REQUEST_TIMEOUT = int(os.getenv("TELEGRAM_REQUEST_TIMEOUT", "10"))
-CONNECTION_RETRIES = int(os.getenv("TELEGRAM_CONNECTION_RETRIES", "2"))
-RETRY_DELAY = float(os.getenv("TELEGRAM_RETRY_DELAY", "1"))
-DC_ID_RAW = os.getenv("TELEGRAM_DC_ID")
-DC_IP = os.getenv("TELEGRAM_DC_IP")
-DC_PORT_RAW = os.getenv("TELEGRAM_DC_PORT")
-TELEGRAM_DC = (
-    (int(DC_ID_RAW), DC_IP, int(DC_PORT_RAW))
-    if DC_ID_RAW and DC_IP and DC_PORT_RAW
-    else None
-)
+CONNECTION_RETRIES = int(os.getenv("TELEGRAM_CONNECTION_RETRIES", "5"))
+
+# Параметры Test DC
+USE_TEST_DC = True # Переключите в False для реального номера
 
 SESSION_DIR.mkdir(parents=True, exist_ok=True)
 
 async def main():
-    print(f"--- Создание сессии для Telegram (Ручной режим) ---")
+    print(f"\n--- Создание сессии для Telegram ---", flush=True)
     
     if not API_ID or not API_HASH:
-        print("\n❌ ОШИБКА: Не найдены ключи API в .env")
+        print("❌ ОШИБКА: Проверьте API_ID и API_HASH в .env", flush=True)
         return
 
     client = TelegramClient(
-        str(SESSION_FILE),
-        int(API_ID),
+        str(SESSION_FILE), 
+        int(API_ID), 
         API_HASH,
-        timeout=REQUEST_TIMEOUT,
         connection_retries=CONNECTION_RETRIES,
-        retry_delay=RETRY_DELAY,
+        retry_delay=2
     )
+    
+    if USE_TEST_DC:
+        # Принудительно ставим DC 2 (самый стабильный тестовый)
+        print("📡 Настройка на Test DC 2...", flush=True)
+        client.session.set_dc(2, '149.154.167.40', 443)
 
-    if TELEGRAM_DC:
-        dc_id, dc_ip, dc_port = TELEGRAM_DC
-        print(f"📡 Используем тестовый DC {dc_id} ({dc_ip}:{dc_port}).")
-        client.session.set_dc(dc_id, dc_ip, dc_port)
-        client.session.save()
-
-    print("⏳ Подключаемся к серверам Telegram...")
+    print("⏳ Соединение с сервером...", flush=True)
     try:
         await asyncio.wait_for(client.connect(), timeout=CONNECT_TIMEOUT)
-    except asyncio.TimeoutError:
-        print(
-            "❌ Таймаут подключения к Telegram. "
-            "Проверьте TELEGRAM_DC_* или сеть/прокси."
-        )
+    except Exception as e:
+        print(f"❌ Не удалось подключиться: {e}", flush=True)
         return
 
     if await client.is_user_authorized():
-        print("\n✅ Сессия уже активна! Файл session валиден.")
-        print("Ничего делать не нужно. Можно запускать тесты.")
+        print("✅ Вы уже авторизованы! Файл сессии готов.", flush=True)
         await client.disconnect()
         return
 
-    print("\n👇 Введите ваш номер телефона в международном формате.")
-    print("Пример: +79001234567")
-    phone = input("Ваш телефон: ").strip()
+    print("\n" + "="*40, flush=True)
+    print("ШАГ 1: Введите номер телефона", flush=True)
+    if USE_TEST_DC:
+        print("Подсказка: используйте 9996621111", flush=True)
+    print("="*40, flush=True)
+    
+    # Небольшая пауза для корректной отрисовки в терминалах Anaconda
+    await asyncio.sleep(0.5)
+    
+    print("Номер телефона >> ", end='', flush=True)
+    phone = sys.stdin.readline().strip()
+
+    if not phone:
+        # Если readline вернул пустоту, пробуем обычный input как запасной вариант
+        phone = input().strip()
+
+    if not phone:
+        print("❌ Номер не введен. Прерывание.", flush=True)
+        return
 
     try:
-        print(f"\n📤 Отправляем запрос кода на номер {phone}...")
-        # Явная отправка запроса на код
-        send_status = await client.send_code_request(phone)
-        print("✅ Telegram принял запрос! Код должен прийти в приложение или СМС.")
-    except errors.FloodWaitError as e:
-        print(f"\n❌ ОШИБКА: Слишком много попыток. Telegram просит подождать {e.seconds} секунд.")
-        return
-    except errors.PhoneNumberInvalidError:
-        print("\n❌ ОШИБКА: Неверный формат номера телефона. Обязательно используйте +7...")
-        return
+        print(f"\n📤 Запрашиваем код для {phone}...", flush=True)
+        await client.send_code_request(phone)
+        
+        print("\n" + "="*40, flush=True)
+        print("ШАГ 2: Введите код подтверждения", flush=True)
+        if USE_TEST_DC:
+            print(f"Подсказка: для DC 2 код всегда 22222", flush=True)
+        print("="*40, flush=True)
+        
+        print("Код подтверждения >> ", end='', flush=True)
+        code = sys.stdin.readline().strip()
+        if not code:
+            code = input().strip()
+        
+        # Завершаем авторизацию
+        await client.sign_in(phone, code)
+        print("\n✅ УСПЕХ! Сессия сохранена в /sessions/tester.session", flush=True)
+        
+    except errors.SessionPasswordNeededError:
+        print("\n🔐 Требуется пароль 2FA:", flush=True)
+        print("Пароль >> ", end='', flush=True)
+        pw = sys.stdin.readline().strip()
+        if not pw: pw = input().strip()
+        await client.sign_in(password=pw)
+        print("\n✅ УСПЕХ! Авторизация по 2FA пройдена.", flush=True)
     except Exception as e:
-        print(f"\n❌ Ошибка при отправке запроса: {e}")
-        return
+        print(f"\n❌ Ошибка: {e}", flush=True)
+    finally:
+        await client.disconnect()
 
-    await client.disconnect()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+if __name__ == '__main__':
+    # Фикс для корректной работы ввода/вывода в Windows
+    if os.name == 'nt':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nПрервано пользователем.")
