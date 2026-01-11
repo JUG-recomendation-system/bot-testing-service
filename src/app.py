@@ -3,6 +3,7 @@ import asyncio
 import re
 import random
 import pandas as pd
+from fastapi import FastAPI, HTTPException, Query
 from telethon import TelegramClient
 from src.config import API_ID, API_HASH, BOT_USERNAME, SESSION_FILE, SCENARIO_FILE, LOG_DIR
 
@@ -31,6 +32,9 @@ class BotTester:
 
     async def start_client(self):
         """Подключение к Telegram."""
+        if API_ID is None or not API_HASH:
+            logger.error("ОШИБКА: TELEGRAM_API_ID/TELEGRAM_API_HASH не заданы.")
+            raise Exception("Missing Telegram API credentials")
         self.client = TelegramClient(str(SESSION_FILE), API_ID, API_HASH)
         await self.client.connect()
 
@@ -258,6 +262,7 @@ tester = BotTester()
 
 async def run_tests(specific_scenario=None):
     setup_file_logging()
+    success = True
     try:
         await tester.start_client()
         grouped = tester.load_scenarios()
@@ -265,16 +270,42 @@ async def run_tests(specific_scenario=None):
         if specific_scenario:
             # grouped может быть {} если CSV не прочитался
             if hasattr(grouped, "groups") and specific_scenario in grouped.groups:
-                await tester.run_scenario(specific_scenario, grouped.get_group(specific_scenario))
+                success = await tester.run_scenario(
+                    specific_scenario,
+                    grouped.get_group(specific_scenario),
+                )
             else:
                 logger.error(f"Сценарий '{specific_scenario}' не найден.")
+                success = False
         else:
             if hasattr(grouped, "__iter__"):
                 for name, steps in grouped:
-                    await tester.run_scenario(name, steps)
+                    scenario_success = await tester.run_scenario(name, steps)
+                    success = success and scenario_success
             else:
                 logger.error("Не удалось загрузить сценарии (grouped пустой).")
+                success = False
     except Exception as e:
         logger.error(f"Global Error: {e}")
+        success = False
     finally:
         await tester.stop_client()
+    return success
+
+
+app = FastAPI(title="Bot Testing Service")
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+
+@app.post("/run")
+async def run_scenarios(
+    scenario: str | None = Query(default=None, description="Имя сценария для запуска"),
+):
+    success = await run_tests(scenario)
+    if not success:
+        raise HTTPException(status_code=500, detail="Test run failed")
+    return {"status": "completed", "scenario": scenario}
