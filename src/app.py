@@ -29,6 +29,11 @@ class BotTester:
     def __init__(self):
         self.client = None
         self.last_bot_response = ""  # последний текст от бота (для UNTIL_REPLY)
+        self.last_bot_message = None  # последнее сообщение от бота
+
+    def _update_last_bot_message(self, message):
+        self.last_bot_message = message
+        self.last_bot_response = message.text or ""
 
     async def start_client(self):
         """Подключение к Telegram."""
@@ -198,8 +203,10 @@ class BotTester:
                     # 3.3 Кнопки
                     elif ("Нажимает" in user_action) or ("кнопку" in user_action):
                         # Ждем сообщение, где должны быть кнопки
-                        last_msg = await conv.get_response()
-                        self.last_bot_response = last_msg.text or ""
+                        last_msg = self.last_bot_message
+                        if last_msg is None:
+                            last_msg = await conv.get_response()
+                        self._update_last_bot_message(last_msg)
 
                         m = re.search(r'["\'](.*?)["\']', user_action)
                         btn_text = (m.group(1) if m else "").strip()
@@ -232,7 +239,7 @@ class BotTester:
                     # -----------------------------
                     if expected_reply and not pd.isna(expected_reply):
                         response = await conv.get_response()
-                        self.last_bot_response = response.text or ""
+                        self._update_last_bot_message(response)
                         if self.smart_compare(expected_reply, self.last_bot_response):
                             logger.info("👌 Ответ корректен.")
                         else:
