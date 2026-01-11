@@ -56,6 +56,12 @@ async def main():
     except Exception as e:
         print(f"❌ Не удалось подключиться: {e}", flush=True)
         return
+    except Exception as exc:
+        print(
+            "❌ Не удалось подключиться к Telegram. "
+            f"Детали ошибки: {exc!r}"
+        )
+        return
 
     if await client.is_user_authorized():
         print("✅ Вы уже авторизованы! Файл сессии готов.", flush=True)
