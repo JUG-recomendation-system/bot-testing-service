@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import sys
 from getpass import getpass
 from pathlib import Path
@@ -10,7 +11,7 @@ from pyrogram import Client
 # --- ИНСТРУКЦИЯ ---
 # 1. Запустите скрипт: python generate_session.py
 # 2. Введите номер (для Test DC: 9996612023)
-# 3. Введите код (для Test DC: 11111)
+# 3. Введите код (для Test DC: 11111 или вычислится из номера)
 # 4. Если приглашение ">>" не появилось через 5 секунд, нажмите Enter.
 
 BASE_DIR = Path(__file__).parent.resolve()
@@ -29,7 +30,13 @@ CONNECT_TIMEOUT = int(os.getenv("TELEGRAM_CONNECT_TIMEOUT", "20"))
 # Параметры Test DC
 USE_TEST_DC = True  # Переключите в False для реального номера
 DEFAULT_TEST_PHONE = "99966" + "1" + "2023"
-DEFAULT_TEST_CODE = "1" * 5
+
+
+def get_confirmation_code(phone: str) -> str | None:
+    match = re.match(r"99966(?P<dc>[0-3]{1})(?P<rand_part>[0-9]{4})", phone)
+    if not match:
+        return None
+    return match.group("dc") * 5
 
 SESSION_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -68,14 +75,15 @@ async def main():
     print("\n" + "=" * 40, flush=True)
     print("ШАГ 2: Введите код подтверждения", flush=True)
     if USE_TEST_DC:
-        print(f"Подсказка: для Test DC код всегда {DEFAULT_TEST_CODE}", flush=True)
+        print("Подсказка: код для Test DC вычисляется из номера", flush=True)
     print("=" * 40, flush=True)
 
     print("Код подтверждения >> ", end="", flush=True)
     code = sys.stdin.readline().strip()
     if not code and USE_TEST_DC:
-        code = DEFAULT_TEST_CODE
-        print(code, flush=True)
+        code = get_confirmation_code(phone)
+        if code:
+            print(code, flush=True)
     if not code:
         code = input().strip()
 
