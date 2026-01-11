@@ -35,6 +35,14 @@ class BotTester:
         self.last_bot_message = message
         self.last_bot_response = message.text or ""
 
+    async def _try_get_response(self, conv, timeout=1):
+        try:
+            response = await asyncio.wait_for(conv.get_response(), timeout=timeout)
+        except asyncio.TimeoutError:
+            logger.debug("Нет ответа от бота в коротком таймауте. Продолжаем.")
+            return None
+        return response
+
     async def start_client(self):
         """Подключение к Telegram."""
         if API_ID is None or not API_HASH:
@@ -248,8 +256,10 @@ class BotTester:
                             logger.info(f"   Получили: {self.last_bot_response[:200]}...")
                             return False
                     else:
-                        # Если не ждем конкретного текста — не блокируемся ожиданием.
-                        await asyncio.sleep(1)
+                        # Если не ждем конкретного текста — пробуем короткий неблокирующий ответ.
+                        response = await self._try_get_response(conv)
+                        if response is not None:
+                            self._update_last_bot_message(response)
 
                     i += 1
 
