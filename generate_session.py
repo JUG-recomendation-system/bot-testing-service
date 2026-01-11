@@ -60,6 +60,12 @@ async def main():
             "Проверьте TELEGRAM_DC_* или сеть/прокси."
         )
         return
+    except Exception as exc:
+        print(
+            "❌ Не удалось подключиться к Telegram. "
+            f"Детали ошибки: {exc!r}"
+        )
+        return
 
     if await client.is_user_authorized():
         print("\n✅ Сессия уже активна! Файл session валиден.")
