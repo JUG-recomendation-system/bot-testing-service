@@ -7,7 +7,19 @@ from typing import Protocol
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from telethon import TelegramClient
-from src.config import API_ID, API_HASH, BOT_USERNAME, SESSION_FILE, SCENARIO_FILE, LOG_DIR
+from src.config import (
+    API_ID,
+    API_HASH,
+    BOT_USERNAME,
+    CONNECTION_RETRIES,
+    CONNECT_TIMEOUT,
+    LOG_DIR,
+    REQUEST_TIMEOUT,
+    RETRY_DELAY,
+    SCENARIO_FILE,
+    SESSION_FILE,
+    TELEGRAM_DC,
+)
 
 # --- НАСТРОЙКА ЛОГГЕРА ---
 logger = logging.getLogger("TestEngine")
@@ -45,8 +57,28 @@ class TelegramConversationAdapter:
         if API_ID is None or not API_HASH:
             logger.error("ОШИБКА: TELEGRAM_API_ID/TELEGRAM_API_HASH не заданы.")
             raise Exception("Missing Telegram API credentials")
-        self.client = TelegramClient(str(SESSION_FILE), API_ID, API_HASH)
-        await self.client.connect()
+        self.client = TelegramClient(
+            str(SESSION_FILE),
+            API_ID,
+            API_HASH,
+            timeout=REQUEST_TIMEOUT,
+            connection_retries=CONNECTION_RETRIES,
+            retry_delay=RETRY_DELAY,
+        )
+        if TELEGRAM_DC:
+            dc_id, dc_ip, dc_port = TELEGRAM_DC
+            logger.info(f"📡 Используем тестовый DC {dc_id} ({dc_ip}:{dc_port}).")
+            self.client.session.set_dc(dc_id, dc_ip, dc_port)
+            self.client.session.save()
+
+        try:
+            await asyncio.wait_for(self.client.connect(), timeout=CONNECT_TIMEOUT)
+        except asyncio.TimeoutError as exc:
+            logger.error(
+                "⏳ Таймаут подключения к Telegram. "
+                "Проверьте TELEGRAM_DC_* или сеть/прокси."
+            )
+            raise exc
 
     async def disconnect(self) -> None:
         if self.client:
