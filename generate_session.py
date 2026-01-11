@@ -58,13 +58,16 @@ async def main():
     code = input("Код подтверждения: ").strip()
 
     try:
-        await client.sign_in(phone, code)
+        await client.sign_in(phone=phone, code=code, phone_code_hash=send_status.phone_code_hash)
     except errors.SessionPasswordNeededError:
         print("\n🔐 На аккаунте включена двухфакторная аутентификация (2FA).")
         password = input("Введите ваш пароль от Telegram: ")
         await client.sign_in(password=password)
     except errors.PhoneCodeInvalidError:
         print("\n❌ ОШИБКА: Неверный код.")
+        return
+    except errors.PhoneCodeExpiredError:
+        print("\n❌ ОШИБКА: Код устарел. Запросите новый и повторите попытку.")
         return
     except Exception as e:
         print(f"\n❌ Ошибка при входе: {e}")
