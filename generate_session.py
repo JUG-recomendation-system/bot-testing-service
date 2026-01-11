@@ -85,3 +85,9 @@ async def main():
     except Exception as e:
         print(f"\n❌ Ошибка при отправке запроса: {e}")
         return
+
+    await client.disconnect()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
