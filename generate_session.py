@@ -1,30 +1,82 @@
 import asyncio
 import os
-from telethon import TelegramClient
-from src.config import API_ID, API_HASH, SESSION_FILE, SESSION_DIR
+from pathlib import Path
+from dotenv import load_dotenv
+from telethon import TelegramClient, errors
 
-# Убедимся, что папка существует
+# --- НАСТРОЙКА ПУТЕЙ ---
+BASE_DIR = Path(__file__).parent.resolve()
+ENV_PATH = BASE_DIR / '.env'
+SESSION_DIR = BASE_DIR / 'sessions'
+SESSION_FILE = SESSION_DIR / 'tester.session'
+
+load_dotenv(dotenv_path=ENV_PATH)
+
+API_ID = os.getenv("TELEGRAM_API_ID") or os.getenv("API_ID")
+API_HASH = os.getenv("TELEGRAM_API_HASH") or os.getenv("API_HASH")
+
 SESSION_DIR.mkdir(parents=True, exist_ok=True)
 
 async def main():
-    print(f"--- Создание сессии для Telegram ---")
-    print(f"Путь к файлу: {SESSION_FILE}")
-    print(f"API ID: {API_ID}")
+    print(f"--- Создание сессии для Telegram (Ручной режим) ---")
     
-    # Инициализируем клиент
-    # При первом запуске он попросит ввести номер телефона и код из Telegram в консоли
-    client = TelegramClient(str(SESSION_FILE), API_ID, API_HASH)
+    if not API_ID or not API_HASH:
+        print("\n❌ ОШИБКА: Не найдены ключи API в .env")
+        return
+
+    client = TelegramClient(str(SESSION_FILE), int(API_ID), API_HASH)
     
-    await client.start()
-    
-    print("------------------------------------------------")
-    print("УСПЕХ! Файл сессии создан.")
-    print("Теперь можно запускать основной сервис.")
-    print("------------------------------------------------")
+    print("⏳ Подключаемся к серверам Telegram...")
+    await client.connect()
+
+    if await client.is_user_authorized():
+        print("\n✅ Сессия уже активна! Файл session валиден.")
+        print("Ничего делать не нужно. Можно запускать тесты.")
+        await client.disconnect()
+        return
+
+    print("\n👇 Введите ваш номер телефона в международном формате.")
+    print("Пример: +79001234567")
+    phone = input("Ваш телефон: ").strip()
+
+    try:
+        print(f"\n📤 Отправляем запрос кода на номер {phone}...")
+        # Явная отправка запроса на код
+        send_status = await client.send_code_request(phone)
+        print("✅ Telegram принял запрос! Код должен прийти в приложение или СМС.")
+    except errors.FloodWaitError as e:
+        print(f"\n❌ ОШИБКА: Слишком много попыток. Telegram просит подождать {e.seconds} секунд.")
+        return
+    except errors.PhoneNumberInvalidError:
+        print("\n❌ ОШИБКА: Неверный формат номера телефона. Обязательно используйте +7...")
+        return
+    except Exception as e:
+        print(f"\n❌ Ошибка при отправке запроса: {e}")
+        return
+
+    print("\n👇 Введите код, который пришел вам в Telegram:")
+    code = input("Код подтверждения: ").strip()
+
+    try:
+        await client.sign_in(phone, code)
+    except errors.SessionPasswordNeededError:
+        print("\n🔐 На аккаунте включена двухфакторная аутентификация (2FA).")
+        password = input("Введите ваш пароль от Telegram: ")
+        await client.sign_in(password=password)
+    except errors.PhoneCodeInvalidError:
+        print("\n❌ ОШИБКА: Неверный код.")
+        return
+    except Exception as e:
+        print(f"\n❌ Ошибка при входе: {e}")
+        return
+
+    print("\n✅ УСПЕХ! Файл сессии создан и сохранен.")
+    print(f"Путь: {SESSION_FILE}")
     
     await client.disconnect()
 
 if __name__ == '__main__':
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nОтменено пользователем.")
