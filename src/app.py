@@ -2,6 +2,8 @@ import logging
 import asyncio
 import re
 import random
+from typing import Protocol
+
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from telethon import TelegramClient
@@ -25,9 +27,45 @@ def setup_file_logging():
     return log_file
 
 
-class BotTester:
+class ConversationAdapter(Protocol):
+    async def connect(self) -> None: ...
+
+    async def disconnect(self) -> None: ...
+
+    async def is_user_authorized(self) -> bool: ...
+
+    def conversation(self, bot_username: str, timeout: int = 15): ...
+
+
+class TelegramConversationAdapter:
     def __init__(self):
-        self.client = None
+        self.client: TelegramClient | None = None
+
+    async def connect(self) -> None:
+        if API_ID is None or not API_HASH:
+            logger.error("ОШИБКА: TELEGRAM_API_ID/TELEGRAM_API_HASH не заданы.")
+            raise Exception("Missing Telegram API credentials")
+        self.client = TelegramClient(str(SESSION_FILE), API_ID, API_HASH)
+        await self.client.connect()
+
+    async def disconnect(self) -> None:
+        if self.client:
+            await self.client.disconnect()
+
+    async def is_user_authorized(self) -> bool:
+        if not self.client:
+            return False
+        return await self.client.is_user_authorized()
+
+    def conversation(self, bot_username: str, timeout: int = 15):
+        if not self.client:
+            raise RuntimeError("Telegram client is not initialized.")
+        return self.client.conversation(bot_username, timeout=timeout)
+
+
+class BotTester:
+    def __init__(self, conversation_adapter: ConversationAdapter | None = None):
+        self.conversation_adapter = conversation_adapter
         self.last_bot_response = ""  # последний текст от бота (для UNTIL_REPLY)
         self.last_bot_message = None  # последнее сообщение от бота
 
@@ -45,20 +83,18 @@ class BotTester:
 
     async def start_client(self):
         """Подключение к Telegram."""
-        if API_ID is None or not API_HASH:
-            logger.error("ОШИБКА: TELEGRAM_API_ID/TELEGRAM_API_HASH не заданы.")
-            raise Exception("Missing Telegram API credentials")
-        self.client = TelegramClient(str(SESSION_FILE), API_ID, API_HASH)
-        await self.client.connect()
+        if not self.conversation_adapter:
+            self.conversation_adapter = TelegramConversationAdapter()
+        await self.conversation_adapter.connect()
 
-        if not await self.client.is_user_authorized():
+        if not await self.conversation_adapter.is_user_authorized():
             logger.error("ОШИБКА: Клиент не авторизован! Запустите сначала generate_session.py")
             raise Exception("Client not authorized")
 
     async def stop_client(self):
         """Корректно отключаемся от Telegram."""
-        if self.client:
-            await self.client.disconnect()
+        if self.conversation_adapter:
+            await self.conversation_adapter.disconnect()
 
     def load_scenarios(self):
         """Загрузка CSV и группировка по 'Сценарий'."""
@@ -107,7 +143,10 @@ class BotTester:
         # Счетчики циклов REPEAT: {index_of_repeat_row: current_iter}
         repeat_counters = {}
 
-        async with self.client.conversation(BOT_USERNAME, timeout=15) as conv:
+        if not self.conversation_adapter:
+            raise RuntimeError("Conversation adapter is not configured.")
+
+        async with self.conversation_adapter.conversation(BOT_USERNAME, timeout=15) as conv:
             while i < len(steps):
                 row = steps[i]
                 step_num = row.get("Шаги", i + 1)
