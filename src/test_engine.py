@@ -58,21 +58,24 @@ class BotTester:
                     # Логика динамического цикла UNTIL_REPLY
                     if action.startswith("UNTIL_REPLY"):
                         match = re.search(r'UNTIL_REPLY\s+(\d+)\s+["\'](.*?)["\']', action)
-                        if match:
-                            target_step_id = int(match.group(1))
-                            trigger_text = match.group(2)
-                            
-                            # Если триггера НЕТ в последнем ответе бота — прыгаем назад
-                            if not self.smart_compare(trigger_text, self.last_bot_response):
-                                logger.info(f"🔄 Повтор: Триггер '{trigger_text}' не найден. Прыжок на шаг {target_step_id}")
-                                target_idx = next((idx for idx, s in enumerate(steps) if s['Шаги'] == target_step_id), None)
-                                if target_idx is not None:
-                                    i = target_idx
-                                    continue
-                            else:
-                                logger.info(f"🎯 Условие выхода '{trigger_text}' выполнено.")
-                                i += 1
+                        if not match:
+                            logger.error(f"❌ {error_msg}. Неверный формат UNTIL_REPLY: '{action}'")
+                            return False
+
+                        target_step_id = int(match.group(1))
+                        trigger_text = match.group(2)
+
+                        # Если триггера НЕТ в последнем ответе бота — прыгаем назад
+                        if not self.smart_compare(trigger_text, self.last_bot_response):
+                            logger.info(f"🔄 Повтор: Триггер '{trigger_text}' не найден. Прыжок на шаг {target_step_id}")
+                            target_idx = next((idx for idx, s in enumerate(steps) if s['Шаги'] == target_step_id), None)
+                            if target_idx is not None:
+                                i = target_idx
                                 continue
+                        else:
+                            logger.info(f"🎯 Условие выхода '{trigger_text}' выполнено.")
+                            i += 1
+                            continue
 
                     # Выполнение обычного шага
                     logger.info(f"👉 Шаг {step_id}: {action[:50]}")
@@ -80,7 +83,11 @@ class BotTester:
                     if action.startswith('/'):
                         await conv.send_message(action)
                     elif "Нажимает" in action:
-                        btn_name = re.search(r'["\'](.*?)["\']', action).group(1)
+                        match = re.search(r'["\'](.*?)["\']', action)
+                        if not match:
+                            logger.error(f"❌ {error_msg}. Не найден текст кнопки в кавычках.")
+                            return False
+                        btn_name = match.group(1)
                         # Ждем сообщение с кнопками (если оно еще не пришло)
                         msg = await conv.get_response()
                         if msg.buttons:
