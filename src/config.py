@@ -3,8 +3,9 @@ from pathlib import Path
 
 # --- КОНФИГУРАЦИЯ ---
 # Замени эти данные на свои с my.telegram.org
-API_ID = int(os.environ["TELEGRAM_API_ID"])  
-API_HASH = os.environ["TELEGRAM_API_HASH"] 
+API_ID_RAW = os.getenv("TELEGRAM_API_ID")
+API_ID = int(API_ID_RAW) if API_ID_RAW else None
+API_HASH = os.getenv("TELEGRAM_API_HASH")
 
 # Имя бота, которого тестируем
 BOT_USERNAME = '@jugru_conf_bot'
