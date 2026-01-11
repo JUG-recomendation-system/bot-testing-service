@@ -2,6 +2,7 @@ fastapi
 uvicorn
 jinja2
 telethon
+pyrogram
 pandas
 openpyxl
 python-dotenv
