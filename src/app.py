@@ -54,8 +54,8 @@ class BotTester:
             df = df.dropna(subset=["Сценарий"])
             return df.groupby("Сценарий")
         except Exception as e:
-            logger.error(f"Критическая ошибка чтения CSV: {e}")
-            return {}
+            logger.error(f"Критическая ошибка чтения CSV. Проверьте файл сценариев: {e}")
+            return None
 
     def smart_compare(self, expected, actual):
         """
@@ -267,9 +267,15 @@ async def run_tests(specific_scenario=None):
         await tester.start_client()
         grouped = tester.load_scenarios()
 
+        if grouped is None:
+            logger.error("Не удалось загрузить сценарии: ошибка чтения CSV.")
+            return False
+
         if specific_scenario:
-            # grouped может быть {} если CSV не прочитался
-            if hasattr(grouped, "groups") and specific_scenario in grouped.groups:
+            if (
+                isinstance(grouped, pd.core.groupby.generic.DataFrameGroupBy)
+                and specific_scenario in grouped.groups
+            ):
                 success = await tester.run_scenario(
                     specific_scenario,
                     grouped.get_group(specific_scenario),
@@ -278,7 +284,7 @@ async def run_tests(specific_scenario=None):
                 logger.error(f"Сценарий '{specific_scenario}' не найден.")
                 success = False
         else:
-            if hasattr(grouped, "__iter__"):
+            if isinstance(grouped, pd.core.groupby.generic.DataFrameGroupBy):
                 for name, steps in grouped:
                     scenario_success = await tester.run_scenario(name, steps)
                     success = success and scenario_success
